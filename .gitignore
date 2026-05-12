@@ -1,0 +1,31 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# Data and models (too large for git)
+data/ml-25m/
+data/ml-10m/
+data/*.zip
+model/
+output/
+logs/
+
+# Spark
+metastore_db/
+derby.log
+spark-warehouse/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Screenshots kept; logs not
+logs/*.log
