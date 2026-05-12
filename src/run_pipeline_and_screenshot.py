@@ -17,7 +17,7 @@ What it does:
   7. Screenshots: streaming batches, Spark UI, dashboard
   8. Stops everything cleanly
 """
-import os, sys, subprocess, time, signal, re, textwrap
+import os, sys, subprocess, time, re
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 
@@ -47,26 +47,9 @@ def sh(cmd, capture=True, **kw):
 
 
 def render_text(title, text, out):
-    html = f"""<!DOCTYPE html><html><head><meta charset="utf-8">
-<style>
-body{{background:#1e1e1e;color:#d4d4d4;font-family:'Courier New',monospace;
-     font-size:13px;padding:20px;margin:0}}
-h2{{color:#4ec9b0;margin:0 0 14px;font-size:15px}}
-pre{{background:#0d1117;border:1px solid #30363d;border-radius:8px;
-     padding:18px;white-space:pre-wrap;line-height:1.5}}
-</style></head><body>
-<h2>&#128202; {title}</h2>
-<pre>{text.replace('<','&lt;').replace('>','&gt;')}</pre>
-</body></html>"""
-    tmp = "/tmp/_pipeline_shot.html"
-    Path(tmp).write_text(html)
-    with sync_playwright() as p:
-        b = p.chromium.launch()
-        page = b.new_page(viewport={"width": 920, "height": 700})
-        page.goto(f"file://{tmp}", wait_until="load")
-        page.screenshot(path=str(out), full_page=True)
-        b.close()
-    print(f"  saved {out}")
+    sys.path.insert(0, str(BASE / "src"))
+    from render_screenshot import render
+    render(title, str(text), str(out))
 
 
 def browser_shot(url, out, wait_ms=3000):
