@@ -31,6 +31,7 @@ Kafka Producer ──► ratings-stream  ──► Spark Structured Streaming
 │   ├── dashboard.py              # Streamlit dashboard (bonus)
 │   ├── render_screenshot.py      # Playwright terminal-style screenshot renderer
 │   └── run_pipeline_and_screenshot.py  # automated pipeline orchestrator
+├── data/ml-1m/                   # MovieLens 1M dataset
 ├── screenshots/                  # all captured visuals (see below)
 ├── logs/                         # raw stdout/stderr from each component
 ├── GUIDE.md                      # step-by-step build guide
@@ -84,47 +85,111 @@ python src/run_pipeline_and_screenshot.py
 | Latency (batch 2) | **10.62s** |
 | TRENDING alerts | Movie 2924 (avg_rating ~4.72, sustained) |
 
+---
+
 ## Screenshots
 
 All screenshots were captured from a live execution on 2026-05-12.
 
-### Dataset & Training
+### Project Structure
 
-| File | Description |
-|------|-------------|
-| [`00_project_structure.png`](screenshots/00_project_structure.png) | Project directory tree showing all source files and folders |
-| [`01_als_training_rmse.png`](screenshots/01_als_training_rmse.png) | Full ALS training run — Spark progress bars + RMSE=0.8739 printed |
-| [`01_als_training_log.png`](screenshots/01_als_training_log.png) | ALS training log: data load, split, fit, evaluate stages |
-| [`01_als_training_results.png`](screenshots/01_als_training_results.png) | Training summary: RMSE result and model saved confirmation |
-| [`03_dataset_analysis.png`](screenshots/03_dataset_analysis.png) | MovieLens 1M dataset statistics (ratings distribution, user/movie counts) |
-| [`03_dataset_sample.png`](screenshots/03_dataset_sample.png) | Sample rows from ratings CSV |
-| [`07_als_full_log.png`](screenshots/07_als_full_log.png) | Complete ALS training terminal output from logs/train_als.log |
-| [`08_dataset_sample.png`](screenshots/08_dataset_sample.png) | Dataset sample with header (userId, movieId, rating, timestamp) |
-| [`09_recommendations_output.png`](screenshots/09_recommendations_output.png) | Top-5 recommendations for sample users (users 1, 42, 100, 200, 500) |
+![Project Structure](screenshots/00_project_structure.png)
 
-### Architecture
+---
 
-| File | Description |
-|------|-------------|
-| [`02_architecture.png`](screenshots/02_architecture.png) | System architecture: batch ALS path + streaming pipeline diagram |
+### Architecture Diagram
 
-### Kafka & Streaming
+![Architecture](screenshots/02_architecture.png)
 
-| File | Description |
-|------|-------------|
-| [`11_kafka_topic_created.png`](screenshots/11_kafka_topic_created.png) | `kafka-topics.sh --describe` output — ratings-stream, 2 partitions, replication-factor 1 |
-| [`12_streaming_batches.png`](screenshots/12_streaming_batches.png) | Spark Structured Streaming console output — batch 0/1/2 with window analytics results |
-| [`13_latency.png`](screenshots/13_latency.png) | End-to-end Kafka→Spark latency probe across 3 batches (10.62s best) |
-| [`14_alerts.png`](screenshots/14_alerts.png) | TRENDING alerts — movie 2924 triggering sustained alerts across windows (avg_rating ~4.72) |
+---
 
-### Spark UI & Dashboard
+### Dataset
 
-| File | Description |
-|------|-------------|
-| [`15_spark_ui_streaming.png`](screenshots/15_spark_ui_streaming.png) | Spark UI `/StreamingQuery/` — active streaming query stats |
-| [`15_spark_ui_streaming2.png`](screenshots/15_spark_ui_streaming2.png) | Spark UI streaming page refreshed after 30s more data accumulation |
-| [`16_spark_ui_jobs.png`](screenshots/16_spark_ui_jobs.png) | Spark UI `/jobs/` — all completed Spark jobs from the streaming run |
-| [`17_dashboard.png`](screenshots/17_dashboard.png) | Streamlit dashboard — trending bar chart, Top-5 recs table, TRENDING alerts table |
+**Dataset sample (userId, movieId, rating, timestamp):**
+
+![Dataset Sample](screenshots/03_dataset_sample.png)
+
+**Dataset statistics:**
+
+![Dataset Analysis](screenshots/03_dataset_analysis.png)
+
+---
+
+### ALS Batch Training
+
+**Full training run — Spark progress + RMSE=0.8739:**
+
+![ALS Training RMSE](screenshots/01_als_training_rmse.png)
+
+**Training log (data load → split → fit → evaluate):**
+
+![ALS Training Log](screenshots/01_als_training_log.png)
+
+**Training results summary:**
+
+![ALS Training Results](screenshots/01_als_training_results.png)
+
+**Complete training terminal output:**
+
+![ALS Full Log](screenshots/07_als_full_log.png)
+
+---
+
+### Recommendations
+
+**Top-5 recommendations for sample users (users 1, 42, 100, 200, 500):**
+
+![Recommendations Output](screenshots/09_recommendations_output.png)
+
+---
+
+### Kafka Setup
+
+**Topic created — 2 partitions, replication-factor 1:**
+
+![Kafka Topic Created](screenshots/11_kafka_topic_created.png)
+
+---
+
+### Spark Structured Streaming
+
+**Streaming batches — window analytics results (batch 0/1/2):**
+
+![Streaming Batches](screenshots/12_streaming_batches.png)
+
+**End-to-end Kafka→Spark latency across 3 batches:**
+
+![Latency](screenshots/13_latency.png)
+
+**TRENDING alerts — movie 2924 triggering across windows (avg_rating ~4.72):**
+
+![Alerts](screenshots/14_alerts.png)
+
+---
+
+### Spark UI
+
+**Active streaming query stats:**
+
+![Spark UI Streaming](screenshots/15_spark_ui_streaming.png)
+
+**Streaming page after 30s more data:**
+
+![Spark UI Streaming 2](screenshots/15_spark_ui_streaming2.png)
+
+**All completed Spark jobs:**
+
+![Spark UI Jobs](screenshots/16_spark_ui_jobs.png)
+
+---
+
+### Streamlit Dashboard (Bonus)
+
+**Live dashboard — trending bar chart, Top-5 recs table, TRENDING alerts:**
+
+![Dashboard](screenshots/17_dashboard.png)
+
+---
 
 ## Bonus Features
 
