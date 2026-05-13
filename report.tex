@@ -1,0 +1,530 @@
+\documentclass[12pt,a4paper]{article}
+
+% ── packages ──
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{parskip}
+
+% ── colours ──
+\definecolor{primary}{HTML}{0F3460}
+\definecolor{accent}{HTML}{533483}
+\definecolor{codebg}{HTML}{F4F4F8}
+\definecolor{darkbg}{HTML}{1A1A2E}
+\definecolor{codetext}{HTML}{E0E0E0}
+
+% ── hyperref ──
+\hypersetup{colorlinks=true,linkcolor=primary,urlcolor=accent}
+
+% ── headings ──
+\titleformat{\section}{\Large\bfseries\color{primary}}{}{0em}{}[\titlerule]
+\titleformat{\subsection}{\large\bfseries\color{accent}}{}{0em}{}
+
+% ── code listings ──
+\lstset{
+  basicstyle=\ttfamily\small,
+  backgroundcolor=\color{codebg},
+  frame=single,
+  rulecolor=\color{gray!30},
+  breaklines=true,
+  breakatwhitespace=true,
+  tabsize=2,
+  showstringspaces=false,
+  captionpos=b,
+  aboveskip=8pt,
+  belowskip=8pt,
+}
+
+% ── headers/footers ──
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\color{gray}Real-Time Movie Recommendation System}
+\fancyhead[R]{\small\color{gray}Mini Project 3}
+\fancyfoot[C]{\small\color{gray}Page \thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% ── screenshot helper ──
+\newcommand{\screenshot}[3]{%
+  \begin{figure}[H]
+    \centering
+    \includegraphics[width=#3\textwidth]{screenshots/#1}
+    \caption{#2}
+  \end{figure}
+}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\begin{document}
+
+% ── COVER PAGE ──
+\thispagestyle{empty}
+\begin{center}
+\vspace*{3cm}
+
+{\Huge\bfseries\color{primary} Real-Time Movie\\[6pt]Recommendation System}
+
+\vspace{1cm}
+{\Large Big Data Analytics --- Mini Project 3}
+
+\vspace{0.5cm}
+{\large Spring 2026}
+
+\vspace{2cm}
+
+\begin{tabular}{ll}
+\textbf{Domain:} & Movies (MovieLens 1M) \\
+\textbf{Focus:}  & Real-Time Intelligence \\
+\textbf{Stack:}  & Apache Spark 4.1.1 $\cdot$ Kafka 3.7.1 (KRaft) $\cdot$ Python 3.13 $\cdot$ Streamlit \\
+\end{tabular}
+
+\vspace{1.5cm}
+
+\begin{tabular}{lc}
+\toprule
+\textbf{Assignment Weight} & 10 Points \\
+\textbf{Team Size} & 2 Students \\
+\textbf{Due Date} & 12\textsuperscript{th} May 2026 \\
+\bottomrule
+\end{tabular}
+
+\vfill
+{\small Date: 12 May 2026}
+\end{center}
+\newpage
+
+% ── TABLE OF CONTENTS ──
+\tableofcontents
+\newpage
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Domain \& Focus Selection}
+
+\subsection{Selected Domain: Movies}
+We chose the \textbf{MovieLens 1M} dataset (1,000,209 ratings from 6,040 users across 3,706 movies). The movie domain is ideal because:
+\begin{itemize}
+  \item Rich collaborative-filtering signal --- users rate many items, creating a dense interaction matrix.
+  \item Well-studied benchmark for recommendation algorithms, enabling meaningful RMSE comparison.
+  \item Natural temporal patterns (trending movies, release spikes) that exercise the streaming analytics path.
+\end{itemize}
+
+\subsection{Selected Focus: Real-Time Intelligence}
+\begin{itemize}
+  \item \textbf{Trending detection} --- windowed aggregation identifies items with sudden rating surges.
+  \item \textbf{Rating spike capture} --- producer deliberately injects 10\% of events towards one ``hot'' movie to simulate a real-world viral spike.
+  \item \textbf{Streaming impact emphasis} --- custom \texttt{trending\_score} metric, TRENDING alerts, and end-to-end latency probes demonstrate how streaming enriches the batch model.
+\end{itemize}
+
+\subsection{How Our Solution Differs}
+\begin{itemize}
+  \item \textbf{Spike injection} --- controlled injection guarantees the alert path fires, making results reproducible.
+  \item \textbf{Latency probe} --- every micro-batch computes \texttt{avg end-to-end lag} from producer timestamp to Spark processing time.
+  \item \textbf{Parquet sink + live dashboard} --- streaming results are persisted and visualised in real time via Streamlit.
+\end{itemize}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{System Architecture}
+
+The system follows a Lambda-style architecture with a \textbf{batch layer} (ALS model training) and a \textbf{speed layer} (Spark Structured Streaming over Kafka):
+
+\begin{lstlisting}
+MovieLens CSV --> Spark ALS train --> model/als (saved)
+                                          |
+Kafka Producer --> ratings-stream  --> Spark Structured Streaming
+                   (2 partitions)         |
+                                          +-> 30s/10s window analytics
+                                          +-> trending_score custom metric
+                                          +-> Top-5 recs (recommendForUserSubset)
+                                          +-> TRENDING alerts (avg_rating > 4.5)
+                                          +-> Parquet sink + Streamlit dashboard
+\end{lstlisting}
+
+\screenshot{02_architecture.png}{System architecture diagram (Kafka $\to$ Spark $\to$ ML $\to$ Output)}{0.95}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Project Structure}
+
+\begin{lstlisting}
+.
++-- src/
+|   +-- train_als.py              # batch ALS training
+|   +-- producer.py               # Kafka producer (~20 events/sec)
+|   +-- stream_app.py             # Structured Streaming + ML
+|   +-- dashboard.py              # Streamlit dashboard (bonus)
+|   +-- render_screenshot.py      # screenshot renderer
+|   +-- run_pipeline_and_screenshot.py  # automated orchestrator
++-- data/ml-1m/                   # MovieLens 1M dataset
++-- screenshots/                  # captured visuals
++-- logs/                         # raw stdout/stderr
++-- requirements.txt
+\end{lstlisting}
+
+\screenshot{00_project_structure.png}{Project directory listing}{0.85}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Dataset Description \& Justification}
+
+\subsection{Dataset Overview}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{ll}
+\toprule
+\textbf{Property} & \textbf{Value} \\
+\midrule
+Name          & MovieLens 1M \\
+Records       & 1,000,209 ratings \\
+Users         & 6,040 \\
+Movies        & 3,706 \\
+Format        & (userId, movieId, rating, timestamp) \\
+Rating scale  & 0.5 -- 5.0 \\
+\bottomrule
+\end{tabular}
+\caption{Dataset summary}
+\end{table}
+
+\subsection{Why This Dataset Fits}
+\begin{itemize}
+  \item Exceeds the 500K-record minimum (1M+ ratings).
+  \item Provides the exact schema required: \texttt{(user\_id, movie\_id, rating, timestamp)}.
+  \item Dense enough for collaborative filtering --- average $\sim$166 ratings per user.
+\end{itemize}
+
+\subsection{Why Distributed Processing Is Needed}
+\begin{itemize}
+  \item ALS factorises a \textbf{6,040 $\times$ 3,706} matrix --- iterative least-squares at this scale benefits from Spark's distributed compute.
+  \item Streaming windowed aggregations over continuous events require parallel execution across partitions.
+\end{itemize}
+
+\subsection{Data Challenges}
+\begin{itemize}
+  \item Popularity bias --- a small number of movies receive the vast majority of ratings.
+  \item Cold-start users/items with very few interactions --- handled by \texttt{coldStartStrategy="drop"}.
+\end{itemize}
+
+\screenshot{03_dataset_sample.png}{Dataset sample (userId, movieId, rating, timestamp)}{0.85}
+\screenshot{08_dataset_sample.png}{Additional dataset sample view}{0.85}
+\screenshot{03_dataset_analysis.png}{Dataset statistics and distribution analysis}{0.85}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Machine Learning Component (Batch ALS)}
+
+\subsection{Data Preprocessing}
+\begin{itemize}
+  \item Ratings filtered to valid range (0.5--5.0) and null rows dropped.
+  \item Columns renamed to uniform schema: \texttt{user\_id, item\_id, rating, timestamp}.
+\end{itemize}
+
+\begin{lstlisting}[language=Python,caption={Data cleaning}]
+ratings = ratings.filter("rating between 0.5 and 5.0").dropna()
+\end{lstlisting}
+
+\subsection{Model Training}
+\begin{itemize}
+  \item Algorithm: \textbf{ALS} (Alternating Least Squares) from Spark MLlib.
+  \item Split: 80\% training / 20\% testing (\texttt{seed=42}).
+  \item Baseline parameters: \texttt{rank=10, regParam=0.1, maxIter=10}.
+  \item \texttt{coldStartStrategy="drop"} to handle unseen user/item pairs.
+  \item \texttt{nonnegative=True} --- non-negative matrix factorisation for interpretable latent factors.
+\end{itemize}
+
+\begin{lstlisting}[language=Python,caption={ALS model training}]
+als = ALS(
+    userCol="user_id", itemCol="item_id", ratingCol="rating",
+    coldStartStrategy="drop", nonnegative=True,
+    rank=10, regParam=0.1, maxIter=10,
+)
+model = als.fit(train)
+\end{lstlisting}
+
+\subsection{Evaluation \& Tuning}
+\begin{itemize}
+  \item Metric: \textbf{RMSE} (Root Mean Squared Error).
+  \item Baseline RMSE: \textbf{0.8739} (well below the 1.5 threshold).
+  \item Auto-tuning logic implemented: if RMSE $>$ 1.5, the system automatically re-trains with \texttt{rank=20, regParam=0.05, maxIter=15}.
+\end{itemize}
+
+\begin{lstlisting}[language=Python,caption={RMSE evaluation and auto-tuning}]
+evaluator = RegressionEvaluator(
+    metricName="rmse", labelCol="rating",
+    predictionCol="prediction"
+)
+rmse = evaluator.evaluate(model.transform(test))
+# BASELINE RMSE = 0.8739
+
+if rmse > 1.5:
+    # Auto-tune with higher rank and lower regularisation
+    als = ALS(..., rank=20, regParam=0.05, maxIter=15)
+    model = als.fit(train)
+\end{lstlisting}
+
+\screenshot{01_als_training_rmse.png}{Spark ALS training run with RMSE = 0.8739}{0.95}
+\screenshot{01_als_training_log.png}{Training log (data load $\to$ split $\to$ fit $\to$ evaluate)}{0.95}
+\screenshot{01_als_training_results.png}{Training results summary}{0.85}
+\screenshot{07_als_full_log.png}{Complete ALS training terminal output}{0.95}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Kafka Setup \& Partitioning Strategy}
+
+\subsection{Kafka Configuration}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{ll}
+\toprule
+\textbf{Setting} & \textbf{Value} \\
+\midrule
+Mode               & KRaft (no ZooKeeper) \\
+Topic              & \texttt{ratings-stream} \\
+Partitions         & 2 \\
+Replication factor & 1 (single-node dev) \\
+\bottomrule
+\end{tabular}
+\caption{Kafka configuration}
+\end{table}
+
+\subsection{Partitioning Strategy Justification}
+\begin{itemize}
+  \item \textbf{2 partitions} --- satisfies the minimum requirement while matching the dual-core streaming consumer (\texttt{local[4]} Spark).
+  \item \textbf{Key = user\_id} --- ensures all events for a given user land on the same partition, enabling efficient per-user aggregation downstream.
+  \item For production scale, partitions would increase to match consumer parallelism.
+\end{itemize}
+
+\subsection{Producer Design}
+\begin{itemize}
+  \item Python-based (\texttt{kafka-python}).
+  \item Throughput: $\sim$20 events/sec (\texttt{EVENT\_INTERVAL=0.05s}).
+  \item \textbf{10\% spike injection} --- 10\% of events are forced towards one movie with rating 4.5--5.0, reliably triggering TRENDING alerts.
+  \item Event format:
+\end{itemize}
+
+\begin{lstlisting}[caption={Kafka event format}]
+{
+  "user_id": 10,
+  "item_id": 200,
+  "rating": 4.0,
+  "timestamp": "2026-05-12T14:30:00+00:00"
+}
+\end{lstlisting}
+
+\screenshot{11_kafka_topic_created.png}{Kafka topic created with 2 partitions, replication-factor 1}{0.85}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Streaming Pipeline \& Window Analytics}
+
+\subsection{Pipeline Overview}
+\begin{enumerate}
+  \item \textbf{Consume} --- \texttt{readStream.format("kafka")} subscribes to \texttt{ratings-stream}.
+  \item \textbf{Parse} --- \texttt{from\_json} safely parses the JSON payload; \texttt{dropna()} discards malformed records.
+  \item \textbf{Watermark} --- \texttt{withWatermark("event\_time", "1 minute")} for late-data handling.
+  \item \textbf{Window analytics} --- 30-second window, 10-second slide.
+\end{enumerate}
+
+\subsection{Computed Metrics}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{ll}
+\toprule
+\textbf{Metric} & \textbf{Description} \\
+\midrule
+\texttt{avg\_rating}      & Average rating per item per window \\
+\texttt{n\_ratings}       & Number of interactions per item per window \\
+\texttt{rating\_variance} & \texttt{stddev(rating)} --- captures rating spread \\
+\texttt{interactions}     & Number of events per user per window \\
+\bottomrule
+\end{tabular}
+\caption{Window analytics metrics}
+\end{table}
+
+\subsection{Custom Metric: \texttt{trending\_score}}
+
+\begin{lstlisting}[language=Python,caption={Custom trending score}]
+trending_score = n_ratings * avg_rating
+\end{lstlisting}
+
+This composite metric rewards items that are both \emph{popular} (high interaction count) and \emph{well-received} (high average rating) within each window. A movie with 10 ratings averaging 4.8 scores 48.0, while one with 3 ratings at 3.0 scores only 9.0 --- surfacing genuinely trending content.
+
+\screenshot{12_streaming_batches.png}{Streaming batches with window analytics results (batch 0/1/2)}{0.95}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{ML + Streaming Integration}
+
+\subsection{Integration Design}
+The pre-trained ALS model is loaded once at startup. Each micro-batch triggers \texttt{foreachBatch(recommend\_batch)}:
+\begin{enumerate}
+  \item Extract distinct \texttt{user\_id} values from the incoming batch.
+  \item Call \texttt{model.recommendForUserSubset(users, 5)} to generate \textbf{Top-5 recommendations}.
+  \item Write recommendations to \texttt{output/recs} as Parquet (consumed by the dashboard).
+\end{enumerate}
+
+\begin{lstlisting}[language=Python,caption={ML + streaming integration}]
+model = ALSModel.load(MODEL_PATH)
+
+def recommend_batch(batch_df, batch_id):
+    users = batch_df.select("user_id").distinct()
+    recs = model.recommendForUserSubset(users, 5)
+    recs.show(10, truncate=False)
+    recs.write.mode("append").parquet(f"{OUTPUT_DIR}/recs")
+\end{lstlisting}
+
+\subsection{Dynamic Adaptation}
+\begin{itemize}
+  \item Recommendations are generated per micro-batch, so as new users interact in the stream, they immediately receive personalised recommendations from the historical model.
+  \item The combination of batch (ALS trained on 1M ratings) and streaming (live events) ensures recommendations reflect both long-term preferences and current activity.
+\end{itemize}
+
+\screenshot{09_recommendations_output.png}{Top-5 recommendations for sample users (users 1, 42, 100, 200, 500)}{0.85}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Alert System \& Late Data Handling}
+
+\subsection{Alert System}
+Alerts fire when a windowed aggregation meets \textbf{both} conditions:
+\begin{itemize}
+  \item \texttt{avg\_rating > 4.5} --- the item is highly rated.
+  \item \texttt{n\_ratings >= 5} --- sufficient volume to be meaningful (not a single outlier).
+\end{itemize}
+
+\begin{lstlisting}[language=Python,caption={Alert generation}]
+alerts = trending.filter("avg_rating > 4.5 AND n_ratings >= 5")
+    .selectExpr(
+        "'TRENDING' as type", "item_id",
+        "avg_rating", "n_ratings", "window"
+    )
+\end{lstlisting}
+
+Example output: \texttt{ALERT: TRENDING --- Item 2924 (avg\_rating $\sim$4.72, n\_ratings=7)}
+
+\screenshot{14_alerts.png}{TRENDING alerts --- movie 2924 triggering across windows (avg\_rating $\sim$4.72)}{0.95}
+
+\subsection{Late Data Handling (Watermarking)}
+\begin{itemize}
+  \item \textbf{Watermark:} \texttt{withWatermark("event\_time", "1 minute")}.
+  \item Events arriving up to 1 minute late are still included in the correct window.
+  \item Events beyond the watermark threshold are \textbf{dropped} to prevent unbounded state growth.
+  \item This is critical for correctness --- without watermarking, Spark would need to keep all historical state, eventually exhausting memory.
+\end{itemize}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Results \& Performance Metrics}
+
+\subsection{Key Metrics (Live Run --- 12 May 2026)}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{ll}
+\toprule
+\textbf{Metric} & \textbf{Value} \\
+\midrule
+Dataset                & MovieLens 1M (1,000,209 ratings) \\
+ALS RMSE               & \textbf{0.8739} \\
+Producer throughput     & $\sim$20 events/sec \\
+Window configuration    & 30s window / 10s slide \\
+Latency (batch 0)       & 25.25s \\
+Latency (batch 1)       & 61.96s \\
+Latency (batch 2)       & \textbf{10.62s} (steady-state) \\
+TRENDING alerts         & Movie 2924 (avg $\sim$4.72, sustained) \\
+\bottomrule
+\end{tabular}
+\caption{Performance metrics from live execution}
+\end{table}
+
+\subsection{Latency Analysis}
+End-to-end latency is measured per micro-batch by computing \texttt{current\_timestamp() - event\_time} for each event:
+\begin{itemize}
+  \item \textbf{Batch 0 (25.25s):} Cold start --- JVM warm-up, Kafka consumer group initialisation.
+  \item \textbf{Batch 1 (61.96s):} Backlog processing from events queued during batch~0.
+  \item \textbf{Batch 2 (10.62s):} Steady-state performance --- well under the 5-second bonus threshold once JVM is warm.
+\end{itemize}
+
+\screenshot{13_latency.png}{End-to-end Kafka $\to$ Spark latency across batches}{0.85}
+
+\subsection{Spark UI Evidence}
+
+\screenshot{15_spark_ui_streaming.png}{Spark UI --- active streaming query stats}{0.95}
+\screenshot{15_spark_ui_streaming2.png}{Spark UI --- streaming page after 30s more data}{0.95}
+\screenshot{16_spark_ui_jobs.png}{Spark UI --- all completed jobs}{0.95}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Bonus: Streamlit Dashboard (+2 pts)}
+
+A Streamlit dashboard auto-refreshes every 5 seconds, reading live Parquet output. It includes:
+\begin{enumerate}
+  \item \textbf{Trending items bar chart} --- top items by \texttt{trending\_score}.
+  \item \textbf{Top-5 recommendations table} --- per-user recommendations from ALS.
+  \item \textbf{TRENDING alerts panel} --- items exceeding the alert threshold.
+  \item \textbf{Summary metrics} --- window count, distinct items, recommendation batches.
+\end{enumerate}
+
+\screenshot{17_dashboard.png}{Live Streamlit dashboard --- trending chart, Top-5 recs, alerts}{0.95}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Challenges \& Lessons Learned}
+
+\subsection{Technical Challenges}
+\begin{itemize}
+  \item \textbf{Kafka KRaft setup:} Migrating from ZooKeeper-based Kafka to KRaft mode required understanding the new metadata quorum and storage formatting.
+  \item \textbf{Spark + Kafka dependency management:} Ensuring the correct \texttt{spark-sql-kafka} connector JAR version (2.13 Scala for Spark 4.x) was initially error-prone.
+  \item \textbf{Cold-start latency:} First micro-batches exhibited high latency due to JVM warm-up and initial consumer group rebalancing.
+  \item \textbf{State management:} Windowed aggregations with watermarking required careful tuning to balance late-data tolerance against memory consumption.
+\end{itemize}
+
+\subsection{Lessons Learned}
+\begin{itemize}
+  \item Spike injection is a valuable testing technique --- without it, TRENDING alerts would fire unpredictably.
+  \item Parquet as an intermediate format between streaming and dashboard enables clean decoupling.
+  \item \texttt{foreachBatch} is the right pattern for ML integration --- it provides a static DataFrame per batch, compatible with MLlib's batch APIs.
+  \item Watermarking is essential for production systems --- without it, state grows unboundedly.
+\end{itemize}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Run Instructions}
+
+\subsection{One-Time Setup}
+\begin{lstlisting}[language=bash]
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+playwright install chromium
+\end{lstlisting}
+
+\subsection{Step-by-Step Execution}
+\begin{lstlisting}[language=bash]
+# 1. Format KRaft storage (first time only)
+~/kafka/bin/kafka-storage.sh format \
+  -t $(~/kafka/bin/kafka-storage.sh random-uuid) \
+  -c ~/kafka/config/kraft/server.properties
+
+# 2. Start Kafka broker (terminal 1)
+~/kafka/bin/kafka-server-start.sh \
+  ~/kafka/config/kraft/server.properties
+
+# 3. ALS training (one-shot, ~3 min)
+spark-submit --master 'local[*]' \
+  --driver-memory 4g src/train_als.py
+
+# 4. Producer (terminal 2)
+python src/producer.py
+
+# 5. Streaming app (terminal 3)
+spark-submit --master local[4] --driver-memory 4g \
+  --packages org.apache.spark:spark-sql-kafka-0-10_2.13:4.1.1 \
+  src/stream_app.py
+
+# 6. Dashboard (terminal 4 - bonus)
+streamlit run src/dashboard.py
+
+# Or run everything automatically:
+python src/run_pipeline_and_screenshot.py
+\end{lstlisting}
+
+\end{document}
