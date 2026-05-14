@@ -159,7 +159,7 @@ All screenshots were captured from a live execution on 2026-05-12.
 
 **End-to-end Kafka→Spark latency across 3 batches:**
 
-![Latency](screenshots/13_latency.png)
+![Latency](screenshots/13_latency.jpeg)
 
 **TRENDING alerts — movie 2924 triggering across windows (avg_rating ~4.72):**
 
