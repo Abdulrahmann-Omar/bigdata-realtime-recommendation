@@ -82,7 +82,7 @@ python src/run_pipeline_and_screenshot.py
 | Window | 30s window / 10s slide |
 | Latency (batch 0) | 25.25s |
 | Latency (batch 1) | 61.96s |
-| Latency (batch 2) | **10.62s** |
+| Latency (batch 2) | **4.00** |
 | TRENDING alerts | Movie 2924 (avg_rating ~4.72, sustained) |
 
 ---
